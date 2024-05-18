@@ -54,70 +54,68 @@ public class algoritmoHashingReceiver extends JFrame
         setVisible(true);
     }
     
-    private void downloadFile()
-    {
-        try 
-        {
+    private void downloadFile() {
+        try {
             ServerSocket serverSocket = new ServerSocket(Porta);
             Socket socket = serverSocket.accept();
-            InputStream is = socket.getInputStream();
-            ObjectInputStream ois = new ObjectInputStream(is);
+            InputStream input = socket.getInputStream();
+            ObjectInputStream output = new ObjectInputStream(input);
 
             // Ricevi nome file e hash dall'uploader
-            String fileName = (String) ois.readObject();
-            String receivedHash = (String) ois.readObject();
+            String nomeFile = (String) output.readObject();
+            String hashRicevuto = (String) output.readObject();
 
             // Ottieni il path del sistema della cartella downloader
-            String downloadFolderPath = System.getProperty("user.home") + File.separator + "Downloads";
-            String filePath = downloadFolderPath + File.separator + fileName;
+            String cartellaDownload = System.getProperty("user.home") + File.separator + "Downloads";
+            String filePath = cartellaDownload + File.separator + "(Copia)" + nomeFile;
 
             // Crea un output per scrivere il file sul disco
-            FileOutputStream fos = new FileOutputStream(filePath);
-            byte[] dataBytes = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = is.read(dataBytes)) != -1) 
-            {
-                fos.write(dataBytes, 0, bytesRead);
+            FileOutputStream fileOutput = new FileOutputStream(filePath);
+            byte[] vettoreByte = new byte[1024];
+            int byteLetti;
+            while ((byteLetti = input.read(vettoreByte)) != -1) {
+                fileOutput.write(vettoreByte, 0, byteLetti);
             }
-            fos.close();
+            fileOutput.close();
 
             // Verifica integrità
-            String selectedAlgorithm = (String) boxSceltaAlgoritmo.getSelectedItem();
-            MessageDigest md = MessageDigest.getInstance(selectedAlgorithm);
-            FileInputStream fis = new FileInputStream(filePath);
+            String stringAlgoritmoScelto = (String) boxSceltaAlgoritmo.getSelectedItem();
+            MessageDigest md = MessageDigest.getInstance(stringAlgoritmoScelto);
+            FileInputStream fileInput = new FileInputStream(filePath);
             
             byte[] buffer = new byte[1024];
-            int n;
+            int byteLetto = 0;
             
-            while ((n = fis.read(buffer)) != -1)
-            {
-                md.update(buffer, 0, n);
+            while ((byteLetto = fileInput.read(buffer)) != -1) {
+                md.update(buffer, 0, byteLetto);
             }
             
-            byte[] hashBytes = md.digest();
-            StringBuilder sb = new StringBuilder();
+            byte[] vettoreHashByte = md.digest();
+            StringBuilder tempStringBuilder = new StringBuilder();
             
-            for (byte b : hashBytes)
-            {
-                sb.append(String.format("%02x", b));
+            for (int i = 0; i < vettoreHashByte.length; i++) {
+                tempStringBuilder.append(String.format("%02x", vettoreHashByte[i]));
             }
             
-            String fileHash = sb.toString();
+            String fileHash = tempStringBuilder.toString();
             
-            areaStampa.append("Downloaded File Hash (" + selectedAlgorithm + "): " + fileHash + "\n");
-            String integrityMessage = (fileHash.equals(receivedHash)) ? "Integrity Verified" : "Integrity Failed";
-            areaStampa.append(integrityMessage + "\n");
+            String risultatoIntegrita;
+            if (fileHash.equals(hashRicevuto)) {
+                risultatoIntegrita = "Integrity Verified";
+            } else {
+                risultatoIntegrita = "Integrity Failed";
+            }
+            
+            areaStampa.append("SERVER\nAlgoritmo scelto: " + stringAlgoritmoScelto + "\nHash: " + fileHash + "\nIntegrità: " + risultatoIntegrita + "\n\n");
 
             // Chiudi la connessione
-            fis.close();
-            ois.close();
-            is.close();
+            fileInput.close();
+            output.close();
+            input.close();
             socket.close();
             serverSocket.close();
 
-        }
-        catch (Exception ex)
-        {
+        } catch (Exception ex) {
             ex.printStackTrace();
         }
     }

@@ -6,6 +6,7 @@ import java.security.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.nio.file.*;
 
 /**
  *
@@ -14,7 +15,8 @@ import java.awt.event.*;
 
 public class algoritmoHashingSender extends JFrame
 {
-    private JButton bottoneUpload, bottoneUploadCorrupted;
+    JLabel labelSceltaAlgoritmo = new JLabel("Selezione algoritmo:");
+    private JButton bottoneInvio, bottoneInvioCorruzione;
     private JTextArea areaStampa;
     private JComboBox<String> boxSceltaAlgoritmo;
     private String IP;
@@ -32,31 +34,31 @@ public class algoritmoHashingSender extends JFrame
         JPanel panel = new JPanel();
         panel.setLayout(new GridLayout(7, 1));
 
-        bottoneUpload = new JButton("Carica File");
-        bottoneUploadCorrupted = new JButton("Carica File Corrotto");
+        bottoneInvio = new JButton("Invia File");
+        bottoneInvioCorruzione = new JButton("Invia file simulando corruzione");
         areaStampa = new JTextArea();
+        boxSceltaAlgoritmo = new JComboBox<>(new String[]{"MD5", "SHA-1", "SHA-256"});
         JScrollPane scrollPane = new JScrollPane(areaStampa);
         areaStampa.setEditable(false);
 
-        panel.add(bottoneUpload);
-        panel.add(bottoneUploadCorrupted);
-        panel.add(new JLabel("Selezione algoritmo:"));
-        boxSceltaAlgoritmo = new JComboBox<>(new String[]{"MD5", "SHA-1", "SHA-256"});
+        panel.add(bottoneInvio);
+        panel.add(bottoneInvioCorruzione);
+        panel.add(labelSceltaAlgoritmo);
         panel.add(boxSceltaAlgoritmo);
 
-        bottoneUpload.addActionListener(new ActionListener()
+        bottoneInvio.addActionListener(new ActionListener()
         {
             public void actionPerformed(ActionEvent e) 
             {
-                uploadFile();
+                invioFile();
             }
         });
         
-        bottoneUploadCorrupted.addActionListener(new ActionListener()
+        bottoneInvioCorruzione.addActionListener(new ActionListener()
         {
             public void actionPerformed(ActionEvent e)
             {
-                uploadCorruptedFile();
+                invioFileCorruzione();
             }
         });
 
@@ -66,14 +68,14 @@ public class algoritmoHashingSender extends JFrame
         setVisible(true);
     }
 
-    private void uploadFile()
+    private void invioFile()
     { 
         String userDir = System.getProperty("user.home");
         JFileChooser fileChooser = new JFileChooser(userDir +"/Desktop");
         
-        int valoreRitorno = fileChooser.showOpenDialog(null);
+        int tempReturn = fileChooser.showOpenDialog(null);
         
-        if (valoreRitorno == JFileChooser.APPROVE_OPTION)
+        if(tempReturn == JFileChooser.APPROVE_OPTION)
         {
             File fileSelezionato = fileChooser.getSelectedFile();
             String stringAlgoritmoScelto = (String) boxSceltaAlgoritmo.getSelectedItem();
@@ -83,27 +85,28 @@ public class algoritmoHashingSender extends JFrame
                 MessageDigest algoritmoScelto = MessageDigest.getInstance(stringAlgoritmoScelto);
                 FileInputStream input = new FileInputStream(fileSelezionato);
                 byte[] vettoreBytes = new byte[1024];
-                int bytes = 0;
+                int byteLetto = 0;
                 
-                while ((bytes = input.read(vettoreBytes)) != -1)
+                while ((byteLetto = input.read(vettoreBytes)) != -1)
                 {
-                    algoritmoScelto.update(vettoreBytes, 0, bytes);
+                    algoritmoScelto.update(vettoreBytes, 0, byteLetto);
                 }
                 
                 // Vettore con i valori del vettoreBytes hashati 
-                byte[] vettoreHashedBytes = algoritmoScelto.digest();
-                StringBuilder sb = new StringBuilder();
+                byte[] vettoreHashByte = algoritmoScelto.digest();
+                StringBuilder tempStringBuilder = new StringBuilder();
                 
-                for (int i = 0; i < vettoreHashedBytes.length; i++)
+                for (int i = 0; i < vettoreHashByte.length; i++)
                 {
-                    byte b = vettoreHashedBytes[i];
-                    sb.append(String.format("%02x", b));
+                    byte tempByteLetto = vettoreHashByte[i];
+                    //Conversione in esadecimale
+                    tempStringBuilder.append(String.format("%02x", tempByteLetto));
                 }
                 
-                String valoreHashFinale = sb.toString();
-                areaStampa.append("Uploaded File Hash (" + stringAlgoritmoScelto + "): " + valoreHashFinale + "\n");
+                String valoreHashFinale = tempStringBuilder.toString();
+                areaStampa.append("CLIENT\nAlgoritmo scelto: " + stringAlgoritmoScelto + "\nHash: " + valoreHashFinale + "\n\n");
 
-                // Crea connessione al downloader
+                // Crea connessione al server
                 Socket socket = new Socket(IP, Porta);
                 OutputStream output = socket.getOutputStream();
                 ObjectOutputStream objOutput = new ObjectOutputStream(output);
@@ -115,83 +118,11 @@ public class algoritmoHashingSender extends JFrame
                 // Invia il contenuto del file al downloader
                 BufferedInputStream bufferInput = new BufferedInputStream(new FileInputStream(fileSelezionato));
                 byte[] buffer = new byte[1024];
-                int contatore;
+                int tempbyteLetto;
                 
-                while ((contatore = bufferInput.read(buffer)) > 0)
+                while ((tempbyteLetto = bufferInput.read(buffer)) > 0)
                 {
-                    output.write(buffer, 0, contatore);
-                }
-
-                input.close();
-                bufferInput.close();
-                objOutput.close();
-                output.close();
-                socket.close();
-                
-            }
-            catch (Exception ex) 
-            {
-                ex.printStackTrace();
-            }
-        }
-    }
-    
-    private void uploadCorruptedFile()
-    { 
-        String userDir = System.getProperty("user.home");
-        JFileChooser fileChooser = new JFileChooser(userDir +"/Desktop");
-        
-        int valoreRitorno = fileChooser.showOpenDialog(null);
-        
-        if(valoreRitorno == JFileChooser.APPROVE_OPTION)
-        {
-            File fileSelezionato = fileChooser.getSelectedFile();
-            String stringAlgoritmoScelto = (String) boxSceltaAlgoritmo.getSelectedItem();
-            
-            try
-            {
-                MessageDigest algoritmoScelto = MessageDigest.getInstance(stringAlgoritmoScelto);
-                FileInputStream input = new FileInputStream(fileSelezionato);
-                byte[] vettoreBytes = new byte[1024];
-                int bytes = 0;
-                
-                while ((bytes = input.read(vettoreBytes)) != -1)
-                {
-                    // Simula la corruzione del file
-                    corruptData(vettoreBytes);
-                    algoritmoScelto.update(vettoreBytes, 0, bytes);
-                }
-                
-                // Vettore con i valori del vettoreBytes hashati 
-                byte[] vettoreHashedBytes = algoritmoScelto.digest();
-                StringBuilder sb = new StringBuilder();
-                
-                for (int i = 0; i < vettoreHashedBytes.length; i++)
-                {
-                    byte b = vettoreHashedBytes[i];
-                    sb.append(String.format("%02x", b));
-                }
-                
-                String valoreHashFinale = sb.toString();
-                areaStampa.append("Uploaded File Hash (" + stringAlgoritmoScelto + "): " + valoreHashFinale + "\n");
-
-                // Crea connessione al downloader
-                Socket socket = new Socket(IP, Porta);
-                OutputStream output = socket.getOutputStream();
-                ObjectOutputStream objOutput = new ObjectOutputStream(output);
-
-                // Invia il nome del file e gli hash al downloader
-                objOutput.writeObject(fileSelezionato.getName());
-                objOutput.writeObject(valoreHashFinale);
-
-                // Invia il contenuto del file al downloader
-                BufferedInputStream bufferInput = new BufferedInputStream(new FileInputStream(fileSelezionato));
-                byte[] buffer = new byte[1024];
-                int contatore;
-                
-                while ((contatore = bufferInput.read(buffer)) > 0)
-                {
-                    output.write(buffer, 0, contatore);
+                    output.write(buffer, 0, tempbyteLetto);
                 }
 
                 input.close();
@@ -207,16 +138,115 @@ public class algoritmoHashingSender extends JFrame
             }
         }
     }
-
-    private void corruptData(byte[] dataBytes)
+    
+    private void invioFileCorruzione()
     {
-        // Simula la corruzione
-        byte savedBytes = dataBytes[0];
-        dataBytes[0] = (byte) (Math.random() * 255);
+        String userDir = System.getProperty("user.home");
+        JFileChooser fileChooser = new JFileChooser(userDir +"/Desktop");
         
-        while(dataBytes[0] == savedBytes)
+        int tempReturn = fileChooser.showOpenDialog(null);
+        
+        if(tempReturn == JFileChooser.APPROVE_OPTION)
         {
-            dataBytes[0] = (byte) (Math.random() * 255);
+            File fileSelezionato = fileChooser.getSelectedFile();
+            File tempFile = new File(userDir +"/Desktop"+"tempFile.txt");
+            
+            copiaFile(fileSelezionato.toPath(), tempFile.toPath());
+            
+            String stringAlgoritmoScelto = (String) boxSceltaAlgoritmo.getSelectedItem();
+            
+            try
+            {
+                MessageDigest algoritmoScelto = MessageDigest.getInstance(stringAlgoritmoScelto);
+                FileInputStream input = new FileInputStream(fileSelezionato);
+                byte[] vettoreBytes = new byte[1024];
+                int byteLetto = 0;
+                
+                while ((byteLetto = input.read(vettoreBytes)) != -1)
+                {
+                    algoritmoScelto.update(vettoreBytes, 0, byteLetto);
+                }
+                
+                // Vettore con i valori del vettoreBytes hashati (crea l'HASH)
+                byte[] vettoreHashByte = algoritmoScelto.digest();
+                StringBuilder tempStringBuilder = new StringBuilder();
+                
+                // Corrompe il contenuto del file da inviare
+                byte[] vectRandomByte = generaDatiCasuali();
+                simulaCorruzione(fileSelezionato, vectRandomByte);
+                
+                for (int i = 0; i < vettoreHashByte.length; i++)
+                {
+                    byte tempByteLetto = vettoreHashByte[i];
+                    //Conversione in esadecimale
+                    tempStringBuilder.append(String.format("%02x", tempByteLetto));
+                }
+                
+                String valoreHashFinale = tempStringBuilder.toString();
+                areaStampa.append("CLIENT\nAlgoritmo scelto: " + stringAlgoritmoScelto + "\nHash: " + valoreHashFinale + "\n\n");
+
+                // Crea connessione al downloader
+                Socket socket = new Socket(IP, Porta);
+                OutputStream output = socket.getOutputStream();
+                ObjectOutputStream objOutput = new ObjectOutputStream(output);
+
+                // Invia il nome del file e gli hash al downloader
+                objOutput.writeObject(fileSelezionato.getName());
+                objOutput.writeObject(valoreHashFinale);
+
+                // Invia il contenuto del file al downloader
+                BufferedInputStream bufferInput = new BufferedInputStream(new FileInputStream(fileSelezionato));
+                byte[] buffer = new byte[1024];
+                int tempbyteLetto;
+                
+                while ((tempbyteLetto = bufferInput.read(buffer)) > 0)
+                {
+                    output.write(buffer, 0, tempbyteLetto);
+                }
+                
+                input.close();
+                bufferInput.close();
+                objOutput.close();
+                output.close();
+                socket.close();
+                
+                copiaFile(tempFile.toPath(), fileSelezionato.toPath());
+                tempFile.delete();
+                
+            } 
+            catch (Exception ex)
+            {
+                ex.printStackTrace();
+            }
         }
     }
+    
+    private void simulaCorruzione(File file, byte[] vettoreByte) 
+    {
+        try (FileOutputStream fileOutputStream = new FileOutputStream(file, true)) {
+            // Aggiungi l'array di byte al file
+            fileOutputStream.write(vettoreByte);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null, "Errore", "Errore", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private static byte[] generaDatiCasuali() 
+    {
+        int lunghezza = 100;
+        byte[] datiCasuali = new byte[lunghezza];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(datiCasuali);
+        return datiCasuali;
+    }
+    
+    private static void copiaFile(Path pathFileMittente, Path pathFileDestinatario)
+    {
+        try{
+            Files.copy(pathFileMittente, pathFileDestinatario, StandardCopyOption.REPLACE_EXISTING);
+        }catch(Exception e){
+            JOptionPane.showMessageDialog(null, "Errore", "Errore", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
 }
